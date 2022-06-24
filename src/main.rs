@@ -4,7 +4,9 @@ use image::{ImageBuffer, Rgb, RgbImage};
 use indicatif::ProgressBar;
 use log::{info, LevelFilter};
 use rand::{thread_rng, Rng};
+use std::fs;
 use std::io::Write;
+use wallpaper;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -24,6 +26,10 @@ struct Cli {
     /// The path of the output image
     #[clap(short, long, name = "FILE")]
     output: Option<String>,
+
+    /// Set the generated image as wallpaper
+    #[clap(long)]
+    wallpaper: bool,
 }
 
 fn main() {
@@ -45,15 +51,19 @@ fn main() {
 
     let img = make_image(args.width, args.height, args.dots);
 
+    let save_path: String;
     info!("Saving image");
     if let Some(path) = args.output {
-        img.save(path).unwrap();
+        save_path = path;
     } else {
-        img.save(format!(
-            "{}x{} - {}.png",
-            args.width, args.height, args.dots
-        ))
-        .unwrap();
+        save_path = format!("{}x{} - {}.png", args.width, args.height, args.dots);
+    }
+
+    img.save(&save_path).unwrap();
+
+    if args.wallpaper {
+        info!("Setting image as wallpaper");
+        wallpaper::set_from_path(fs::canonicalize(save_path).unwrap().to_str().unwrap()).unwrap();
     }
 }
 
