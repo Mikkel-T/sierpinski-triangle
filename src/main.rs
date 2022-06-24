@@ -1,6 +1,6 @@
 use clap::Parser;
 use env_logger::Builder;
-use image::{Rgb, RgbImage};
+use image::{ImageBuffer, Rgb, RgbImage};
 use indicatif::ProgressBar;
 use log::{info, LevelFilter};
 use rand::{thread_rng, Rng};
@@ -20,6 +20,10 @@ struct Cli {
     /// Number of dots to draw on the image
     #[clap(short, long)]
     dots: u64,
+
+    /// The path of the output image
+    #[clap(short, long, name = "FILE")]
+    output: Option<String>,
 }
 
 fn main() {
@@ -39,10 +43,21 @@ fn main() {
         .filter(None, LevelFilter::Info)
         .init();
 
-    make_image(args.width, args.height, args.dots);
+    let img = make_image(args.width, args.height, args.dots);
+
+    info!("Saving image");
+    if let Some(path) = args.output {
+        img.save(path).unwrap();
+    } else {
+        img.save(format!(
+            "{}x{} - {}.png",
+            args.width, args.height, args.dots
+        ))
+        .unwrap();
+    }
 }
 
-fn make_image(width: u32, height: u32, dots: u64) {
+fn make_image(width: u32, height: u32, dots: u64) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
     info!("Creating a Sierpiński triangle with {dots} points on a {width}x{height} image");
     let positions = [
         [width / 10, height - (height / 10)],
@@ -75,6 +90,5 @@ fn make_image(width: u32, height: u32, dots: u64) {
     }
     bar.finish();
 
-    info!("Saving image");
-    img.save(format!("{width}x{height} - {dots}.png")).unwrap();
+    img
 }
