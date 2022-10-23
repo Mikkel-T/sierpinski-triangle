@@ -1,41 +1,52 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use env_logger::Builder;
 use image::{ImageBuffer, Rgb, RgbImage};
 use indicatif::ProgressBar;
 use log::{info, warn, LevelFilter};
 use rand::{thread_rng, Rng};
+
 use std::fs;
 use std::io::Write;
 use std::num::IntErrorKind;
 use std::num::ParseIntError;
+
 use wallpaper;
 
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Cli {
-    /// Width of the image (In pixels)
-    #[clap(short, long)]
-    width: u32,
+    #[clap(subcommand)]
+    command: Commands,
+}
 
-    /// Height of the image (In pixels)
-    #[clap(short, long)]
-    height: u32,
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Generate a new Sierpiński triangle
+    Generate {
+        /// Width of the image (In pixels)
+        #[clap(short, long)]
+        width: u32,
 
-    /// Number of dots to draw on the image
-    #[clap(short, long)]
-    dots: u64,
+        /// Height of the image (In pixels)
+        #[clap(short, long)]
+        height: u32,
 
-    /// The path of the output image
-    #[clap(short, long, name = "FILE")]
-    output: Option<String>,
+        /// Number of dots to draw on the image
+        #[clap(short, long)]
+        dots: u64,
 
-    /// The color of the pixels being placed (In hex format)
-    #[clap(short, long)]
-    color: Option<String>,
+        /// The path of the output image
+        #[clap(short, long, name = "FILE")]
+        output: Option<String>,
 
-    /// Set the generated image as wallpaper
-    #[clap(long)]
-    wallpaper: bool,
+        /// The color of the pixels being placed (In hex format)
+        #[clap(short, long)]
+        color: Option<String>,
+
+        /// Set the generated image as wallpaper
+        #[clap(long)]
+        wallpaper: bool,
+    },
 }
 
 fn main() {
@@ -55,21 +66,33 @@ fn main() {
         .filter(None, LevelFilter::Info)
         .init();
 
-    let img = make_image(args.width, args.height, args.dots, get_color(args.color));
+    match args.command {
+        Commands::Generate {
+            width,
+            height,
+            dots,
+            output,
+            color,
+            wallpaper,
+        } => {
+            let img = make_image(width, height, dots, get_color(color));
 
-    let save_path: String;
-    info!("Saving image");
-    if let Some(path) = args.output {
-        save_path = path;
-    } else {
-        save_path = format!("{}x{} - {}.png", args.width, args.height, args.dots);
-    }
+            let save_path: String;
+            info!("Saving image");
+            if let Some(path) = output {
+                save_path = path;
+            } else {
+                save_path = format!("{}x{} - {}.png", width, height, dots);
+            }
 
-    img.save(&save_path).unwrap();
+            img.save(&save_path).unwrap();
 
-    if args.wallpaper {
-        info!("Setting image as wallpaper");
-        wallpaper::set_from_path(fs::canonicalize(save_path).unwrap().to_str().unwrap()).unwrap();
+            if wallpaper {
+                info!("Setting image as wallpaper");
+                wallpaper::set_from_path(fs::canonicalize(save_path).unwrap().to_str().unwrap())
+                    .unwrap();
+            }
+        }
     }
 }
 
