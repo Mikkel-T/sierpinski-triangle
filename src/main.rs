@@ -1,14 +1,15 @@
 use clap::{Parser, Subcommand};
 use env_logger::Builder;
-use image::{ImageBuffer, Rgb, RgbImage};
+use image::{GenericImageView, ImageBuffer, Rgb, RgbImage};
 use indicatif::ProgressBar;
-use log::{info, warn, LevelFilter};
+use log::{error, info, warn, LevelFilter};
 use rand::{thread_rng, Rng};
 
 use std::fs;
 use std::io::Write;
 use std::num::IntErrorKind;
 use std::num::ParseIntError;
+use std::process;
 
 use wallpaper;
 
@@ -47,6 +48,24 @@ enum Commands {
         #[clap(long)]
         wallpaper: bool,
     },
+
+    /// Add a Sierpiński triangle to an image
+    Image {
+        /// The image to add a Sierpiński triangle to
+        image: String,
+
+        /// Number of dots to draw on the image
+        #[clap(short, long)]
+        dots: u64,
+
+        /// The path of the output image
+        #[clap(short, long, name = "FILE")]
+        output: Option<String>,
+
+        /// Set the generated image as wallpaper
+        #[clap(long)]
+        wallpaper: bool,
+    },
 }
 
 fn main() {
@@ -75,28 +94,60 @@ fn main() {
             color,
             wallpaper,
         } => {
-            let img = make_image(width, height, dots, get_color(color));
+            let col = get_color(color);
+            let img = make_image(width, height, dots, |_, _| col);
 
-            let save_path: String;
-            info!("Saving image");
-            if let Some(path) = output {
-                save_path = path;
-            } else {
-                save_path = format!("{}x{} - {}.png", width, height, dots);
-            }
+            handle_image(img, dots, output, wallpaper);
+        }
+        Commands::Image {
+            image,
+            dots,
+            output,
+            wallpaper,
+        } => {
+            info!("Reading {image}");
+            let im = image::open(&image).unwrap_or_else(|err| {
+                error!("Couldn't read file {image}: {err}");
+                process::exit(1);
+            });
 
-            img.save(&save_path).unwrap();
+            let img = make_image(im.dimensions().0, im.dimensions().1, dots, |x, y| {
+                let px = im.get_pixel(x, y);
+                Rgb::from([px[0], px[1], px[2]])
+            });
 
-            if wallpaper {
-                info!("Setting image as wallpaper");
-                wallpaper::set_from_path(fs::canonicalize(save_path).unwrap().to_str().unwrap())
-                    .unwrap();
-            }
+            handle_image(img, dots, output, wallpaper);
         }
     }
 }
 
-fn make_image(width: u32, height: u32, dots: u64, color: Rgb<u8>) -> ImageBuffer<Rgb<u8>, Vec<u8>> {
+fn handle_image(img: ImageBuffer<Rgb<u8>, Vec<u8>>, dots: u64, output: Option<String>, wallpaper: bool) {
+    let save_path: String;
+    info!("Saving image");
+    if let Some(path) = output {
+        save_path = path;
+    } else {
+        save_path = format!("{}x{} - {}.png", img.dimensions().0, img.dimensions().1, dots);
+    }
+
+    img.save(&save_path).unwrap();
+
+    if wallpaper {
+        info!("Setting image as wallpaper");
+        wallpaper::set_from_path(fs::canonicalize(save_path).unwrap().to_str().unwrap())
+            .unwrap();
+    }
+}
+
+fn make_image<F>(
+    width: u32,
+    height: u32,
+    dots: u64,
+    color: F,
+) -> ImageBuffer<Rgb<u8>, Vec<u8>>
+where
+    F: Fn(u32, u32) -> Rgb<u8>,
+{
     info!("Creating a Sierpiński triangle with {dots} points on a {width}x{height} image");
     let positions = [
         [width / 10, height - (height / 10)],
@@ -110,7 +161,7 @@ fn make_image(width: u32, height: u32, dots: u64, color: Rgb<u8>) -> ImageBuffer
 
     info!("Placing corners");
     for [x, y] in positions {
-        img.put_pixel(x, y, color);
+        img.put_pixel(x, y, color(x, y));
     }
 
     info!("Placing dots");
@@ -118,7 +169,7 @@ fn make_image(width: u32, height: u32, dots: u64, color: Rgb<u8>) -> ImageBuffer
     let bar = ProgressBar::new(dots);
     for i in 1..=dots {
         let n = rng.gen_range(0..=2);
-        img.put_pixel(last[0], last[1], color);
+        img.put_pixel(last[0], last[1], color(last[0], last[1]));
         last = [
             ((last[0] + positions[n][0]) / 2),
             ((last[1] + positions[n][1]) / 2),
