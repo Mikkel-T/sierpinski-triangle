@@ -95,7 +95,7 @@ fn main() {
             wallpaper,
         } => {
             let col = get_color(color);
-            let img = make_image(width, height, dots, |_, _| col);
+            let img = make_image(RgbImage::new(width, height), dots, |_, _| col);
 
             handle_image(img, dots, output, wallpaper);
         }
@@ -111,7 +111,7 @@ fn main() {
                 process::exit(1);
             });
 
-            let img = make_image(im.dimensions().0, im.dimensions().1, dots, |x, y| {
+            let img = make_image(im.grayscale().brighten(-50).to_rgb8(), dots, |x, y| {
                 let px = im.get_pixel(x, y);
                 Rgb::from([px[0], px[1], px[2]])
             });
@@ -121,33 +121,43 @@ fn main() {
     }
 }
 
-fn handle_image(img: ImageBuffer<Rgb<u8>, Vec<u8>>, dots: u64, output: Option<String>, wallpaper: bool) {
+fn handle_image(
+    img: ImageBuffer<Rgb<u8>, Vec<u8>>,
+    dots: u64,
+    output: Option<String>,
+    wallpaper: bool,
+) {
     let save_path: String;
     info!("Saving image");
     if let Some(path) = output {
         save_path = path;
     } else {
-        save_path = format!("{}x{} - {}.png", img.dimensions().0, img.dimensions().1, dots);
+        save_path = format!(
+            "{}x{} - {}.png",
+            img.dimensions().0,
+            img.dimensions().1,
+            dots
+        );
     }
 
     img.save(&save_path).unwrap();
 
     if wallpaper {
         info!("Setting image as wallpaper");
-        wallpaper::set_from_path(fs::canonicalize(save_path).unwrap().to_str().unwrap())
-            .unwrap();
+        wallpaper::set_from_path(fs::canonicalize(save_path).unwrap().to_str().unwrap()).unwrap();
     }
 }
 
 fn make_image<F>(
-    width: u32,
-    height: u32,
+    image: ImageBuffer<Rgb<u8>, Vec<u8>>,
     dots: u64,
     color: F,
 ) -> ImageBuffer<Rgb<u8>, Vec<u8>>
 where
     F: Fn(u32, u32) -> Rgb<u8>,
 {
+    let width = image.dimensions().0;
+    let height = image.dimensions().1;
     info!("Creating a Sierpiński triangle with {dots} points on a {width}x{height} image");
     let positions = [
         [width / 10, height - (height / 10)],
@@ -156,7 +166,7 @@ where
     ];
 
     info!("Creating image");
-    let mut img = RgbImage::new(width, height);
+    let mut img = image;
     let mut last = [width / 2, height / 2 - 1];
 
     info!("Placing corners");
