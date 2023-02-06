@@ -11,8 +11,6 @@ use std::num::IntErrorKind;
 use std::num::ParseIntError;
 use std::process;
 
-use wallpaper;
-
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Cli {
@@ -201,8 +199,8 @@ fn get_color(hex: Option<String>) -> Rgb<u8> {
         }
 
         // Remove # from hex code
-        let mut hex_code = if hex_code.starts_with('#') {
-            (&hex_code[1..]).to_string()
+        let mut hex_code = if let Some(stripped) = hex_code.strip_prefix('#') {
+            stripped.to_string()
         } else {
             hex_code
         };
@@ -230,7 +228,7 @@ fn get_color(hex: Option<String>) -> Rgb<u8> {
             .collect::<Result<Vec<u8>, ParseIntError>>()
         {
             Ok(vec) => {
-                return Rgb([vec[0], vec[1], vec[2]]);
+                Rgb([vec[0], vec[1], vec[2]])
             }
             Err(error) => {
                 match error.kind() {
@@ -240,11 +238,11 @@ fn get_color(hex: Option<String>) -> Rgb<u8> {
                     _ => warn!("An unknown error occurred while parsing the color, using white."),
                 }
 
-                return Rgb([255, 255, 255]);
+                Rgb([255, 255, 255])
             }
         }
     } else {
         info!("No hex color provided, using white.");
-        return Rgb([255, 255, 255]);
+        Rgb([255, 255, 255])
     }
 }
